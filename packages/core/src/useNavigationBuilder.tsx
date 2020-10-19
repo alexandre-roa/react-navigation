@@ -23,30 +23,27 @@ import useFocusEvents from './useFocusEvents';
 import useOnRouteFocus from './useOnRouteFocus';
 import useChildListeners from './useChildListeners';
 import useFocusedListenersChildrenAdapter from './useFocusedListenersChildrenAdapter';
+import useKeyedChildListeners from './useKeyedChildListeners';
+import useOnGetState from './useOnGetState';
+import useScheduleUpdate from './useScheduleUpdate';
+import useCurrentRender from './useCurrentRender';
+import isArrayEqual from './isArrayEqual';
 import {
   DefaultNavigatorOptions,
   RouteConfig,
   PrivateValueStore,
   EventMapBase,
   EventMapCore,
+  NestedNavigateParams,
 } from './types';
-import useKeyedChildListeners from './useKeyedChildListeners';
-import useOnGetState from './useOnGetState';
-import useScheduleUpdate from './useScheduleUpdate';
-import useCurrentRender from './useCurrentRender';
-import isArrayEqual from './isArrayEqual';
 
 // This is to make TypeScript compiler happy
 // eslint-disable-next-line babel/no-unused-expressions
 PrivateValueStore;
 
-type NavigatorRoute = {
+type NavigatorRoute<State extends NavigationState> = {
   key: string;
-  params?: {
-    screen?: string;
-    params?: object;
-    initial?: boolean;
-  };
+  params?: NestedNavigateParams<State>;
 };
 
 /**
@@ -191,7 +188,7 @@ export default function useNavigationBuilder<
   const navigatorKey = useRegisterNavigator();
 
   const route = React.useContext(NavigationRouteContext) as
-    | NavigatorRoute
+    | NavigatorRoute<State>
     | undefined;
 
   const previousNestedParamsRef = React.useRef(route?.params);
@@ -205,6 +202,7 @@ export default function useNavigationBuilder<
     createRouter({
       ...((rest as unknown) as RouterOptions),
       ...(route?.params &&
+      route.params.state == null &&
       route.params.initial !== false &&
       typeof route.params.screen === 'string'
         ? { initialRouteName: route.params.screen }
@@ -239,7 +237,9 @@ export default function useNavigationBuilder<
     (acc, curr) => {
       const { initialParams } = screens[curr];
       const initialParamsFromParams =
-        route?.params?.initial !== false && route?.params?.screen === curr
+        route?.params?.state == null &&
+        route?.params?.initial !== false &&
+        route?.params?.screen === curr
           ? route.params.params
           : undefined;
 
@@ -287,7 +287,10 @@ export default function useNavigationBuilder<
     // We also need to re-initialize it if the state passed from parent was changed (maybe due to reset)
     // Otherwise assume that the state was provided as initial state
     // So we need to rehydrate it to make it usable
-    if (currentState === undefined || !isStateValid(currentState)) {
+    if (
+      (currentState === undefined || !isStateValid(currentState)) &&
+      route?.params?.state == null
+    ) {
       return [
         router.getInitialState({
           routeNames,
@@ -297,10 +300,13 @@ export default function useNavigationBuilder<
       ];
     } else {
       return [
-        router.getRehydratedState(currentState as PartialState<State>, {
-          routeNames,
-          routeParamList,
-        }),
+        router.getRehydratedState(
+          route?.params?.state ?? (currentState as PartialState<State>),
+          {
+            routeNames,
+            routeParamList,
+          }
+        ),
         false,
       ];
     }

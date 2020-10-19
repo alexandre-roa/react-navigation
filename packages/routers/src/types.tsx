@@ -43,6 +43,11 @@ export type InitialState = Readonly<
   }
 >;
 
+export type PartialRoute<R extends Route<string>> = Omit<R, 'key'> & {
+  key?: string;
+  state?: PartialState<NavigationState>;
+};
+
 export type PartialState<State extends NavigationState> = Partial<
   Omit<State, 'stale' | 'type' | 'key' | 'routes' | 'routeNames'>
 > &
